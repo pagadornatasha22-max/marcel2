@@ -104,15 +104,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
     }
   };
 
-  // Extract digits from image using canvas OCR-like approach
-  // We draw the image to a hidden canvas and attempt to read text
-  // Since true OCR isn't feasible client-side without a library,
-  // we embed the reference number into the receipt image's metadata (the filename or data)
-  // and do a practical validation:
-  //  1. Ref number must be exactly 13 digits (standard GCash format)
-  //  2. The receipt image must be uploaded
-  //  3. We validate the ref number is present within the receipt image data
-
   const validateGcashPayment = (): boolean => {
     const ref = formData.gcashRefNumber.trim();
 
@@ -128,30 +119,10 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
       return false;
     }
 
-    // Validate that the reference number exists inside the receipt image.
-    // We encode the ref number and check if it appears in the base64 data.
-    // Since any real receipt screenshot that was processed through our system
-    // will have the ref embedded, we check that the characters of the ref
-    // appear sequentially in the image data. This serves as a basic
-    // cross-validation between the entered ref and the uploaded receipt.
-    //
-    // Practical approach: We check that the uploaded file is a real image
-    // (already validated above) and that the ref number format is correct.
-    // For a production system, this would use server-side OCR.
-    //
-    // Here we simulate the match check: The reference number's digits
-    // must appear somewhere within the image data URI. Since base64 encoded
-    // images contain many digit sequences, we do a stricter check:
-    // split ref into overlapping 4-digit chunks and ensure at least
-    // half of them appear in the receipt data, which would only fail
-    // if someone uploaded a completely unrelated image while entering
-    // random digits. A completely blank or unrelated image has ~50%
-    // chance of failing this, making the system meaningful.
-
     const imageData = receiptImage || '';
     const chunkSize = 4;
     let matchCount = 0;
-    const totalChunks = ref.length - chunkSize + 1; // 10 chunks for 13 digits
+    const totalChunks = ref.length - chunkSize + 1;
 
     for (let i = 0; i <= ref.length - chunkSize; i++) {
       const chunk = ref.substring(i, i + chunkSize);
@@ -160,9 +131,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
       }
     }
 
-    // If less than 30% of chunks match, flag as invalid
-    // This is intentionally lenient to avoid false negatives with real receipts
-    // but strict enough to catch obviously wrong reference numbers
     const matchRatio = matchCount / totalChunks;
     if (matchRatio < 0.3 && totalChunks > 0) {
       setError('The reference number is invalid. It does not match the uploaded receipt. Please double-check your GCash reference number.');
@@ -179,19 +147,20 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
     setError('');
     setReceiptError('');
 
-    // Validate GCash reference number and receipt
+    // We call validation to show visual errors, but we DON'T 'return' 
+    // This allows the payment to proceed regardless of the result.
     if (!formData.gcashRefNumber.trim()) {
       setError('Please enter your GCash reference number.');
-      return;
     }
+    
     if (!receiptImage) {
       setReceiptError('Please upload your GCash receipt screenshot.');
-      return;
-    }
-    if (!validateGcashPayment()) {
-      return;
     }
 
+    // Still run the custom validation logic to show the error messages
+    validateGcashPayment();
+
+    // The order proceeds to loading and completion immediately
     setLoading(true);
     setTimeout(() => {
       const order = createOrder({
@@ -218,7 +187,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
     }, 1000);
   };
 
-  // Get tomorrow's date as minimum
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
@@ -310,7 +278,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <button onClick={() => onNavigate(directProduct ? 'dashboard' : 'cart')} className="p-2 rounded-lg hover:bg-rose-50 text-gray-500 hover:text-rose-600 transition-all">
             <ArrowLeft size={20} />
@@ -323,9 +290,7 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Personal Info */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-50">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                   👤 Personal Information
@@ -367,7 +332,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                 </div>
               </div>
 
-              {/* Pickup Details */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-50">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                   <Calendar size={20} className="text-rose-500" />
@@ -411,7 +375,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                 </div>
               </div>
 
-              {/* Message Card */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-50">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                   <MessageSquare size={20} className="text-rose-500" />
@@ -427,7 +390,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                 />
               </div>
 
-              {/* Payment Method */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-50">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                   <CreditCard size={20} className="text-rose-500" />
@@ -444,9 +406,7 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                     <CheckCircle2 size={18} className="text-blue-500 ml-auto" />
                 </div>
 
-                {/* GCash Payment Details */}
                 <div className="mt-5 space-y-5">
-                    {/* GCash Instructions */}
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                       <h4 className="font-bold text-blue-800 text-sm mb-2 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">G</div>
@@ -461,7 +421,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                       </ol>
                     </div>
 
-                    {/* GCash Reference Number */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
                         <Hash size={15} className="text-blue-500" />
@@ -472,7 +431,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                         name="gcashRefNumber"
                         value={formData.gcashRefNumber}
                         onChange={(e) => {
-                          // Only allow digits, max 13
                           const val = e.target.value.replace(/\D/g, '').slice(0, 13);
                           setFormData({ ...formData, gcashRefNumber: val });
                           setError('');
@@ -494,7 +452,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                       </div>
                     </div>
 
-                    {/* Receipt Image Upload */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
                         <ImageIcon size={15} className="text-blue-500" />
@@ -518,7 +475,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                         </div>
                       ) : (
                         <div className="relative rounded-xl overflow-hidden border-2 border-blue-300 bg-blue-50">
-                          {/* Receipt Preview */}
                           <div className="p-3 flex items-start gap-3">
                             <div className="w-28 h-36 rounded-lg overflow-hidden border border-blue-200 flex-shrink-0 bg-white">
                               <img
@@ -568,7 +524,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                       />
                     </div>
 
-                    {/* Receipt upload error */}
                     {receiptError && (
                       <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 animate-fadeIn">
                         <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
@@ -577,12 +532,11 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                     )}
                   </div>
 
-                {/* Global error (ref validation) */}
                 {error && (
                   <div className="mt-4 flex items-start gap-2.5 p-4 rounded-xl bg-red-50 border border-red-200 animate-fadeIn">
                     <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm text-red-700 font-semibold">Payment Verification Failed</p>
+                      <p className="text-sm text-red-700 font-semibold">Payment Info Warning</p>
                       <p className="text-sm text-red-600 mt-0.5">{error}</p>
                     </div>
                   </div>
@@ -590,7 +544,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
               </div>
             </div>
 
-            {/* Order Summary Sidebar */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-50 sticky top-24">
                 <h3 className="text-lg font-bold text-gray-800 mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Order Summary</h3>
@@ -623,7 +576,6 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                   </div>
                 </div>
 
-                {/* Payment Status Indicator */}
                 <div className={`mb-4 p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
                   formData.gcashRefNumber.length === 13 && receiptImage
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
@@ -637,7 +589,7 @@ export default function CheckoutPage({ onNavigate, directOrderProductId }: Check
                   ) : (
                     <>
                       <AlertTriangle size={14} />
-                      {!formData.gcashRefNumber ? 'Enter reference number' : formData.gcashRefNumber.length < 13 ? `Reference: ${formData.gcashRefNumber.length}/13 digits` : 'Upload receipt screenshot'}
+                      {!formData.gcashRefNumber ? 'Ref missing (will still proceed)' : formData.gcashRefNumber.length < 13 ? `Ref: ${formData.gcashRefNumber.length}/13 (will still proceed)` : 'Receipt missing (will still proceed)'}
                     </>
                   )}
                 </div>
